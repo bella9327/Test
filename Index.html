@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>分戶口資產管理</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .total-card { background: #2c3e50; color: #ecf0f1; border-radius: 15px; }
+        .acc-card { border-left: 5px solid #3498db; transition: 0.3s; }
+        .acc-card:hover { transform: translateY(-3px); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .expense-btn { background-color: #e74c3c; border: none; }
+    </style>
+</head>
+<body>
+
+<div class="container py-5">
+    <!-- 總資產看板 -->
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-8">
+            <div class="card total-card shadow-lg p-4 text-center">
+                <h6 class="text-uppercase opacity-75">家庭總資產 (所有戶口合計)</h6>
+                <h1 class="display-3" id="grandTotal">$ 0</h1>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- 左側：輸入區域 -->
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-3">🏦 戶口資金異動</h5>
+                    <div class="mb-3">
+                        <label class="form-label">戶口名稱</label>
+                        <input type="text" id="accName" class="form-control" placeholder="例如：恆生、虛擬幣、現金">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">金額</label>
+                        <input type="number" id="accAmount" class="form-control" placeholder="0.00">
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-success" onclick="updateMoney('add')">➕ 存入 / 增加</button>
+                        <button class="btn btn-outline-danger" onclick="updateMoney('sub')">➖ 支出 / 扣除</button>
+                    </div>
+                    <p class="text-muted mt-2 small text-center">* 扣除時會自動從該戶口減去金額</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側：分項戶口清單 -->
+        <div class="col-md-8">
+            <h5 class="fw-bold mb-3">📊 各戶口即時餘額</h5>
+            <div id="accountsContainer" class="row g-3">
+                <!-- 這裡會動態生成戶口卡片 -->
+                <div class="col-12 text-center text-muted py-5">目前沒有戶口資料，請從左側新增。</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 核心數據結構
+    let data = JSON.parse(localStorage.getItem('myBudgetData')) || {
+        accounts: {} // 格式: { "恆生": 5000, "現金": 200 }
+    };
+
+    // 儲存並更新畫面
+    function sync() {
+        localStorage.setItem('myBudgetData', JSON.stringify(data));
+        render();
+    }
+
+    function updateMoney(type) {
+        const name = document.getElementById('accName').value.trim();
+        let amount = parseFloat(document.getElementById('accAmount').value);
+
+        if (!name || isNaN(amount)) {
+            alert("請輸入完整的戶口名稱與金額");
+            return;
+        }
+
+        // 如果是扣除，變為負數
+        if (type === 'sub') amount = -amount;
+
+        // 更新數據
+        if (!data.accounts[name]) {
+            data.accounts[name] = 0;
+        }
+        data.accounts[name] += amount;
+
+        // 如果餘額歸零或名稱被清空，可以考慮保留或刪除，這裡預設保留
+        sync();
+        
+        // 清空輸入框
+        document.getElementById('accAmount').value = '';
+    }
+
+    function deleteAccount(name) {
+        if (confirm(`確定要刪除 ${name} 戶口的所有資料嗎？`)) {
+            delete data.accounts[name];
+            sync();
+        }
+    }
+
+    function render() {
+        const container = document.getElementById('accountsContainer');
+        const grandTotalDisplay = document.getElementById('grandTotal');
+        
+        container.innerHTML = '';
+        let totalSum = 0;
+
+        const accountKeys = Object.keys(data.accounts);
+
+        if (accountKeys.length === 0) {
+            container.innerHTML = '<div class="col-12 text-center text-muted py-5">目前沒有戶口資料。</div>';
+        } else {
+            accountKeys.forEach(name => {
+                const balance = data.accounts[name];
+                totalSum += balance;
+
+                const cardHtml = `
+                    <div class="col-md-6">
+                        <div class="card acc-card shadow-sm h-100">
+                            <div class="card-body d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-muted small">${name}</div>
+                                    <div class="h4 mb-0 ${balance < 0 ? 'text-danger' : 'text-dark'}">
+                                        $ ${balance.toLocaleString(undefined, {minimumFractionDigits: 1})}
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-link text-danger" onclick="deleteAccount('${name}')">刪除</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += cardHtml;
+            });
+        }
+
+        // 更新上方總資產
+        grandTotalDisplay.innerText = `$ ${totalSum.toLocaleString(undefined, {minimumFractionDigits: 1})}`;
+        grandTotalDisplay.className = `display-3 ${totalSum < 0 ? 'text-warning' : ''}`;
+    }
+
+    // 初始載入
+    render();
+</script>
+
+</body>
+</html>
